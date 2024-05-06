@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.lang.Math;
 
 /**
  * Сервис обработки информации о подписках
@@ -52,6 +53,23 @@ public class SubscriptionService {
         this.userRepository = userRepository;
     }
 
+    public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; // Радиус Земли в километрах
+
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        double distance = R * c * 1000; // преобразование в метры
+
+        return distance;
+    }
+
     /**
      * Список пожаров за сегодня по подписке
      * @param username - имя пользователя
@@ -81,8 +99,18 @@ public class SubscriptionService {
             entities.addAll(FirmsRequests.getFiresFromCountry(user.getApiKey(), entity.getShortName(),dateRange));
         }
         return entities;
-
-    }
+//        User user = userRepository.findUserByUsername(username);
+//        List<SubscriptionEntity> subscriptionEntities = findAllByUser(username);
+//        List<FireEntity> entities = new ArrayList<>();
+//        for(SubscriptionEntity entity: subscriptionEntities){
+//            List<FireEntity> allFires = FirmsRequests.getFiresFromCountry(user.getApiKey(), entity.getShortName(), dateRange);
+//            List<FireEntity> filteredFires = allFires.stream()
+//                    .filter(fire -> calculateDistance(inputLat, inputLong, fire.getLatitude(), fire.getLongitude()) <= 100)
+//                    .toList();
+//            entities.addAll(filteredFires);
+//        }
+//        return entities;
+    } // TODO: inputLat && inputLong - реализовать ввод координат через нажатие на карту ???
 
     /**
      * Список подписок пользователя

@@ -115,7 +115,16 @@ public class MainController implements Initializable {
         HttpResponse<String> response = Request.getRequest(URLGenerator.getSubscriptionsURL() + "/fires");
         ObjectMapper om = new ObjectMapper();
         List<FireEntity> points = om.readValue(response.body(), new TypeReference<>(){});
-
+        /* В ините запрашиваем все координаты пожаров исходя из подписок, на бэке при запросе к фирмс
+        * фильтруем все координаты исходя из введенной точки координат
+        * значит нужно отображать карту исходя из подписки, далее предлагать пользователю ввод координат на карте
+        * дальше отправляем эти корды бэку и фильтруем карту исходя из нового списка координат
+        *
+        * либо
+        *
+        * переписываем сущность subscription, на старте отрисовываем карту пустую, далее человек на карте отмечает корды,
+        * отправляем их с пост запросом бэку, бэк выдает фильтрованный список сущнойстей пожаров, мы отрисовываем их на карте
+        * */
         csm = new CustomMapLayer();
         assert points != null;
         for(FireEntity point: points){
@@ -141,6 +150,20 @@ public class MainController implements Initializable {
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private void setupMapClickListener() {
+        mapView.setOnMouseClicked(event -> {
+            if (event.isStillSincePress() && event.getClickCount() == 1) {
+                Point2D mapPoint = new Point2D(event.getX(), event.getY());
+                handleMapClick(mapPoint);
+            }
+        });
+    }
+
+    private void handleMapClick(Point2D screenPoint) {
+        MapPoint geoPoint = mapView.getMapPosition(screenPoint.getX(), screenPoint.getY());
+        saveCoordinateToDatabase(geoPoint);
     }
 
     private static class CustomMapLayer extends MapLayer {
