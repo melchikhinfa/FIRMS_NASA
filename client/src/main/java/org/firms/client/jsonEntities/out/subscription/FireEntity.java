@@ -5,6 +5,13 @@ public class FireEntity {
     private double latitude;
     private double longitude;
 
+    private String annotation;
+
+    @Override
+    public String toString() {
+        return "\uD83D\uDD25 Обнаружен пожар в радиусе 1км!\n \uD83D\uDCCD Координаты точки:" + latitude + ", " + longitude;
+    }
+
     public double getLatitude() {
         return latitude;
     }

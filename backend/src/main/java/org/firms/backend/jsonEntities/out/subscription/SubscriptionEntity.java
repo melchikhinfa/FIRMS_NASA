@@ -13,8 +13,9 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class SubscriptionEntity {
-
     private UUID id;
     private String shortName;
     private String regionName;
+    private double latitude;
+    private double longitude;
 }

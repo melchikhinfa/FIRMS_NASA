@@ -2,33 +2,46 @@ package org.firms.client.controllers;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.gluonhq.maps.MapLayer;
 import com.gluonhq.maps.MapPoint;
 import com.gluonhq.maps.MapView;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.event.EventHandler;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.geometry.Insets;
 import javafx.geometry.Point2D;
 import javafx.scene.Node;
-import javafx.scene.control.Alert;
-import javafx.scene.control.Label;
-import javafx.scene.control.Tooltip;
+import javafx.scene.Parent;
+import javafx.scene.control.*;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
+import javafx.stage.Stage;
+import javafx.util.Duration;
 import javafx.util.Pair;
 import org.firms.client.MainApplication;
+import org.firms.client.jsonEntities.out.subscription.CoordinatesDTO;
 import org.firms.client.jsonEntities.out.subscription.FireEntity;
 import org.firms.client.jsonEntities.out.subscription.GetStatusAPIKey;
+import org.firms.client.jsonEntities.out.subscription.SubscriptionEntity;
 import org.firms.client.requests.Request;
 import org.firms.client.requests.URLGenerator;
 import org.firms.client.utils.Utils;
-
+import javafx.scene.Scene;
 import java.io.IOException;
 import java.net.URL;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
 
@@ -43,6 +56,10 @@ public class MainController implements Initializable {
     private MapView mapView;
 
     private CustomMapLayer csm;
+
+    private boolean canAddLocation = false;
+
+    private VBox notificationsBox;
 
     @FXML
     private void exitOnAction(){
@@ -96,12 +113,14 @@ public class MainController implements Initializable {
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
-
+        addLocationButton.setVisible(true);
+        addLocationButton.setOnAction(event -> handleAddLocation());
         fioLabel.setText(Utils.generateFIOLabelText());
 
         try {
             if(Request.getRequest(URLGenerator.getSubscriptionsURL()).statusCode() == 200){
                 showMap();
+                setupAutoRefresh();
             }
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
@@ -112,34 +131,48 @@ public class MainController implements Initializable {
     private MapView createMapView() throws IOException, InterruptedException {
         mapView = new MapView();
         mapView.setPrefSize(900,600);
+
+        MapPoint initialCenter = new MapPoint(55.73906989365343,  37.487185180699285);
+        mapView.setCenter(initialCenter);
+        mapView.setZoom(10);
+
         HttpResponse<String> response = Request.getRequest(URLGenerator.getSubscriptionsURL() + "/fires");
         ObjectMapper om = new ObjectMapper();
-        List<FireEntity> points = om.readValue(response.body(), new TypeReference<>(){});
-        /* В ините запрашиваем все координаты пожаров исходя из подписок, на бэке при запросе к фирмс
-        * фильтруем все координаты исходя из введенной точки координат
-        * значит нужно отображать карту исходя из подписки, далее предлагать пользователю ввод координат на карте
-        * дальше отправляем эти корды бэку и фильтруем карту исходя из нового списка координат
-        *
-        * либо
-        *
-        * переписываем сущность subscription, на старте отрисовываем карту пустую, далее человек на карте отмечает корды,
-        * отправляем их с пост запросом бэку, бэк выдает фильтрованный список сущнойстей пожаров, мы отрисовываем их на карте
-        * */
-        csm = new CustomMapLayer();
-        assert points != null;
-        for(FireEntity point: points){
-            Node icon = new Circle(3, Color.RED);
-            csm.addPoint(new MapPoint(point.getLatitude(), point.getLongitude()), icon);
+
+        try {
+            HttpResponse<String> response2 = Request.getRequest(URLGenerator.getSubscriptionsURL()); // запрос на получение списка подписок
+            List<SubscriptionEntity> subs = om.readValue(response2.body(), new TypeReference<>(){});
+            List<FireEntity> points = om.readValue(response.body(), new TypeReference<>(){});
+
+            assert subs != null && points != null;
+            csm = new CustomMapLayer();
+            for (FireEntity point : points) {
+                Node icon = new Circle(3, Color.RED);
+                csm.addPoint(new MapPoint(point.getLatitude(), point.getLongitude()), icon);
+            }
+
+            Node userIcon = new Circle(7, Color.BLUE);
+            MapPoint userPoint = new MapPoint(subs.get(0).getLatitude(), subs.get(0).getLongitude());
+            csm.addPoint(userPoint, userIcon);
+
+            mapView.addLayer(csm);
+            mapView.setCenter(userPoint);
+            mapView.setZoom(5);
+            updateFireList();
+            return mapView;
+
+        } catch (MismatchedInputException e) {
+            e.printStackTrace();
+            return mapView;
         }
-        mapView.addLayer(csm);
-        mapView.setZoom(5);
-        return mapView;
+
     }
 
     @FXML
     private void showPoints(){
         showMap();
-
+        canAddLocation = true;
+        addLocationButton.setVisible(true);
     }
 
     private void showMap(){
@@ -147,24 +180,147 @@ public class MainController implements Initializable {
         try {
             mapView = createMapView();
             anchorPane.getChildren().add(mapView);
+            notificationsBox = new VBox(10); // 10 - пространство между элементами
+            notificationsBox.setPadding(new Insets(10)); // Отступы вокруг VBox
+            notificationsBox.setStyle("-fx-background-color: #EEE;"); // Цвет фона
+
+            anchorPane.getChildren().add(notificationsBox);
+            anchorPane.setTopAnchor(notificationsBox, 10.0);
+            anchorPane.setRightAnchor(notificationsBox, 10.0);
+
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private void setupMapClickListener() {
-        mapView.setOnMouseClicked(event -> {
-            if (event.isStillSincePress() && event.getClickCount() == 1) {
-                Point2D mapPoint = new Point2D(event.getX(), event.getY());
-                handleMapClick(mapPoint);
+    @FXML
+    private Button addLocationButton;
+
+    @FXML
+    private void handleAddLocation() {
+        canAddLocation = true;
+        // Устанавливаем событие, которое активируется при клике по карте
+        EventHandler<MouseEvent> clickHandler = new EventHandler<MouseEvent>() {
+            @Override
+            public void handle(MouseEvent event) {
+                if (event.isStillSincePress() && event.getClickCount() == 1 |  event.getClickCount() == 1) {
+                    try {
+                        Point2D mapPoint = new Point2D(event.getX(), event.getY());
+                        MapPoint geoPoint = mapView.getMapPosition(mapPoint.getX(), mapPoint.getY());
+                        addCustomPoint(geoPoint);
+                        addCoordinatesToSubs(geoPoint);
+                        event.consume(); // Прекращаем дальнейшую обработку события
+                        // Удаляем обработчик события, чтобы больше не реагировать на клики
+                        mapView.removeEventHandler(MouseEvent.MOUSE_CLICKED, this);
+                        canAddLocation = false; // Делаем кнопку неактивной
+                        updateFireList();
+                    } catch (IOException | InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }
-        });
+        };
+
+        // Добавляем обработчик события на карту, только если это разрешено
+        if (canAddLocation){
+            mapView.addEventHandler(MouseEvent.MOUSE_CLICKED, clickHandler);
+            canAddLocation = false; // После установки обработчика события делаем кнопку неактивной, чтобы избежать повторного добавления
+        } else {
+            Utils.generateAlert(
+                    Alert.AlertType.ERROR,
+                    "Ошибка",
+                    "Вы не можете добавить местоположение, пока не выбрана подписка",
+                    "Пожалуйста выберите подписку"
+            ).showAndWait();
+        }
     }
 
-    private void handleMapClick(Point2D screenPoint) {
-        MapPoint geoPoint = mapView.getMapPosition(screenPoint.getX(), screenPoint.getY());
-        saveCoordinateToDatabase(geoPoint);
+    private void addCustomPoint(MapPoint geoPoint) throws IOException, InterruptedException {
+        Node icon = new Circle(5, Color.BLUE); // Чёрный цвет для пользовательских точек
+        csm.addPoint(geoPoint, icon);
+        icon.setVisible(true);
     }
+
+    @FXML
+    private void setupAutoRefresh() {
+        // Событие, которое будет повторяться каждый час
+        KeyFrame keyFrame = new KeyFrame(Duration.hours(1), event -> {
+            Platform.runLater(() -> {
+                try {
+                    createMapView();
+                } catch (IOException | InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        });
+
+        // Timeline, который запускает KeyFrame
+        Timeline timeline = new Timeline(keyFrame);
+        timeline.setCycleCount(Timeline.INDEFINITE); // Бесконечное повторение
+        timeline.play(); // Запуск таймлайна
+    }
+
+    private void addCoordinatesToSubs(MapPoint geoPoint) throws IOException, InterruptedException {
+        CoordinatesDTO entity = new CoordinatesDTO();
+        entity.setLatitude(geoPoint.getLatitude());
+        entity.setLongitude(geoPoint.getLongitude());
+
+        HttpResponse<String> response2 = Request.getRequest(URLGenerator.getSubscriptionsURL()); // запрос на получение списка подписок
+        ObjectMapper om2 = new ObjectMapper();
+        List<SubscriptionEntity> subs = om2.readValue(response2.body(), new TypeReference<>(){});
+        String subscriptionId = subs.get(0).getId().toString(); // id подписки
+
+        try {
+            HttpResponse<String> response = Request.postRequest(URLGenerator.postSubsCooordinates(subscriptionId), entity);
+            if (response.statusCode() == 200) {
+                Utils.generateAlert(
+                                Alert.AlertType.INFORMATION,
+                                "Отслеживание координат",
+                                "Координаты успешно добавлены",
+                                "Теперь вы будете получать уведомления о пожарах по данному местоположению")
+                        .showAndWait();
+            }
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     * Метод добавления уведомления
+     * @param notification - строчное уведомление
+     */
+    public void addNotification(String notification) {
+        Label label = new Label(notification);
+        label.setWrapText(true);
+
+        Button closeButton = new Button("❌");
+        closeButton.setOnAction(e -> notificationsBox.getChildren().remove(label.getParent()));
+
+        HBox hbox = new HBox(5, label, closeButton); // 5 - расстояние между элементами в HBox
+        Platform.runLater(() -> notificationsBox.getChildren().add(hbox));
+    }
+    @FXML
+//    private void updateFireList(MapPoint geoPoint) throws IOException, InterruptedException {
+    private void updateFireList() throws IOException, InterruptedException {
+        List<FireEntity> fireList = getFiresByCoordinates();
+        for(FireEntity fireItem: fireList) {
+            String item = fireItem.toString();
+            addNotification(item);
+        }
+    }
+
+    private List<FireEntity> getFiresByCoordinates() throws IOException, InterruptedException {
+        HttpResponse<String> response = Request.getRequest(URLGenerator.getFiresByCoords());
+        if (response.statusCode() == 200) {
+            ObjectMapper objectMapper = new ObjectMapper();
+            return objectMapper.readValue(response.body(), new TypeReference<>() {
+            });
+        } else {
+            return new ArrayList<>(); // Возвращение пустого списка в случае других ошибок
+        }
+    }
+
 
     private static class CustomMapLayer extends MapLayer {
         private final ObservableList<Pair<MapPoint, Node>> points = FXCollections.observableArrayList();

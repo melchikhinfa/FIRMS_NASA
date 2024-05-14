@@ -53,6 +53,15 @@ public class SubscriptionService {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Метод для рассчета расстояния между двумя точками
+     * @param lat1 - широта точки 1
+     * @param lon1 - долгота точки 1
+     * @param lat2 - широта точки 2
+     * @param lon2 - долгота точки 2
+     * @return - Расстояние между точками
+     */
+
     public double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
         final int R = 6371; // Радиус Земли в километрах
 
@@ -99,18 +108,28 @@ public class SubscriptionService {
             entities.addAll(FirmsRequests.getFiresFromCountry(user.getApiKey(), entity.getShortName(),dateRange));
         }
         return entities;
+    }
+
+    /**
+     * Пожары в радиусе километра от точки подписки
+     * @param username - имя пользователя
+     * @param dateRange - список дней
+     * @return Список FireEntity - пожаров
+     */
+    public List<FireEntity> getFiresNearBy(String username, String dateRange) throws InterruptedException, CsvValidationException, IOException {
 //        User user = userRepository.findUserByUsername(username);
-//        List<SubscriptionEntity> subscriptionEntities = findAllByUser(username);
-//        List<FireEntity> entities = new ArrayList<>();
-//        for(SubscriptionEntity entity: subscriptionEntities){
+        List<SubscriptionEntity> subscriptionEntities = findAllByUser(username);
+        List<FireEntity> entities = new ArrayList<>();
+        for(SubscriptionEntity entity: subscriptionEntities){
 //            List<FireEntity> allFires = FirmsRequests.getFiresFromCountry(user.getApiKey(), entity.getShortName(), dateRange);
-//            List<FireEntity> filteredFires = allFires.stream()
-//                    .filter(fire -> calculateDistance(inputLat, inputLong, fire.getLatitude(), fire.getLongitude()) <= 100)
-//                    .toList();
-//            entities.addAll(filteredFires);
-//        }
-//        return entities;
-    } // TODO: inputLat && inputLong - реализовать ввод координат через нажатие на карту ???
+            List<FireEntity> allFires = getFiresLastDays(username, dateRange);
+            List<FireEntity> filteredFires = allFires.stream()
+                    .filter(fire -> calculateDistance(entity.getLatitude(), entity.getLongitude(), fire.getLatitude(), fire.getLongitude()) <= 2000)
+                    .toList();
+            entities.addAll(filteredFires);
+        }
+        return entities;
+    }
 
     /**
      * Список подписок пользователя
@@ -126,7 +145,9 @@ public class SubscriptionService {
                         subscription -> new SubscriptionEntity(
                                 subscription.getId(),
                                 subscription.getRegion().getShortName(),
-                                subscription.getRegion().getName()))
+                                subscription.getRegion().getName(),
+                                subscription.getLatitude(),
+                                subscription.getLongitude()))
                 .toList();
         return subs;
     }
@@ -184,4 +205,42 @@ public class SubscriptionService {
 
         }).collect(Collectors.toList());
     }
+
+    /**
+     * Получение списка регионов, на которые не подписан пользователь
+     * @param username - имя пользователя
+     * @param latitude - широта
+     * @param longitude - долгота
+     */
+    public void addOrUpdateSubscription(String username, UUID subscriptionId, Double latitude, Double longitude) {
+        User user = userRepository.findUserByUsername(username);
+        List<Subscription> subscriptions = subscriptionRepository.findAllByUserAndId(user, subscriptionId);
+
+        // Поиск существующей активной подписки по пользователю и активности подписки
+        //List<Subscription> subscriptions = subscriptionRepository.findAllByUserAndActive(user, true);
+
+        Subscription subscription;
+        if (subscriptions.isEmpty()) {
+            Region region = regionRepository.findAllByShortName("RUS");
+            // Создаём новую подписку с регионом RUS, если не нашли существующую
+            subscription = new Subscription();
+            subscription.setUser(user);
+            subscription.setRegion(region);
+            subscription.setActive(true);
+        } else {
+            // Берём существующую подписку
+            subscription = subscriptions.get(0);
+        }
+
+        // Устанавливаем координаты, если они предоставлены
+        if (latitude != null && longitude != null) {
+            subscription.setLatitude(latitude);
+            subscription.setLongitude(longitude);
+        }
+
+        // Сохраняем подписку
+        subscriptionRepository.save(subscription);
+    }
 }
+
+

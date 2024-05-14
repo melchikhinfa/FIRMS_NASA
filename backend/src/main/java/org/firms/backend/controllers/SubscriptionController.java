@@ -2,11 +2,13 @@ package org.firms.backend.controllers;
 
 
 import com.opencsv.exceptions.CsvValidationException;
+import org.firms.backend.jsonEntities.in.user.CoordinatesDTO;
 import org.firms.backend.jsonEntities.out.subscription.FireEntity;
 import org.firms.backend.jsonEntities.out.subscription.GetStatusAPIKey;
 import org.firms.backend.jsonEntities.out.subscription.SubscriptionEntity;
 import org.firms.backend.models.Region;
 import org.firms.backend.services.SubscriptionService;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -65,7 +67,7 @@ public class SubscriptionController {
     }
 
     /**
-     * GET запрос по получению списка подписок за несколько дней
+     * GET запрос по получению списка пожаров за несколько дней
      * @param username имя пользователя
      * @return
      */
@@ -74,6 +76,47 @@ public class SubscriptionController {
         List<FireEntity> entities = subscriptionService.getFiresLastDays(username, dayRange);
         if(entities.isEmpty()){
             return new ResponseEntity<>("", HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity<>(entities, HttpStatus.OK);
+    }
+
+    @PostMapping("/{subscriptionId}/coordinates")
+    public ResponseEntity<?> handleCoordinates(
+            @PathVariable String username,
+            @PathVariable UUID subscriptionId,
+            @RequestBody @NotNull CoordinatesDTO coordinates) throws IOException, InterruptedException {
+
+//        double latitude = coordinates.getLatitude();
+//        double longitude = coordinates.getLongitude();
+
+        subscriptionService.addOrUpdateSubscription(username, subscriptionId, coordinates.getLatitude(), coordinates.getLongitude());
+        return new ResponseEntity<>(HttpStatus.OK);
+    }
+
+//    @PostMapping("/fires/notifications")
+//    public ResponseEntity<?> getFiresNearLastDays(
+//            @PathVariable String username,
+//            @RequestBody @NotNull CoordinatesDTO coordinates) throws CsvValidationException, IOException, InterruptedException {
+//        double latitude = coordinates.getLatitude();
+//        double longitude = coordinates.getLongitude();
+//        String dayRange = "1";
+//
+//        List<FireEntity> entities = subscriptionService.getFiresNearBy(username, latitude, longitude, dayRange);
+//
+//        if (entities.isEmpty()) {
+//            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+//        }
+//        return new ResponseEntity<>(entities, HttpStatus.OK);
+//    }
+
+    @GetMapping("/fires/notifications")
+    public ResponseEntity<?> getFiresNearLastDays(@PathVariable String username) throws CsvValidationException, IOException, InterruptedException {
+        String dayRange = "1";
+
+        List<FireEntity> entities = subscriptionService.getFiresNearBy(username, dayRange);
+
+        if (entities.isEmpty()) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
         }
         return new ResponseEntity<>(entities, HttpStatus.OK);
     }

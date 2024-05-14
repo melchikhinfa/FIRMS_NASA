@@ -23,7 +23,9 @@ public class URLGenerator {
     }
     public static String regionsGetURL(){return getSubscriptionsURL() + "/regions";}
 
+    public static String getFiresByCoords(){ return getSubscriptionsURL() + "/fires/notifications";}
 
+    public static String postSubsCooordinates(String subscriptionId){ return getSubscriptionsURL() + "/" + subscriptionId + "/coordinates";}
 
     public static String postSubscriptionURL(String regionId) {
         return getSubscriptionsURL() + "/regions/" + regionId;

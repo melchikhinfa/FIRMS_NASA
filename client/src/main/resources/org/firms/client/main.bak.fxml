@@ -33,15 +33,20 @@
 -->
 
 <?import javafx.geometry.Insets?>
+<?import javafx.scene.Cursor?>
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
 <?import javafx.scene.control.SeparatorMenuItem?>
+<?import javafx.scene.effect.Shadow?>
 <?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.layout.HBox?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.paint.Color?>
 
 <VBox prefHeight="600.0" prefWidth="900.0" xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="org.firms.client.controllers.MainController">
     <children>
@@ -75,7 +80,7 @@
                     <children>
                         <HBox prefHeight="55.0" prefWidth="893.0">
                             <children>
-                                <Button fx:id="showPointsButton" alignment="CENTER" mnemonicParsing="false" onAction="#showPoints" prefHeight="37.0" prefWidth="706.0" text="Обновить карту 🔄" textAlignment="CENTER">
+                                <Button fx:id="showPointsButton" alignment="CENTER" mnemonicParsing="false" onAction="#showPoints" prefHeight="37.0" prefWidth="706.0" text="Отобразить на карте" textAlignment="CENTER">
                                     <!--                        <Button fx:id="addLocationButton" mnemonicParsing="false" onAction="#handleAddLocation" prefHeight="25.0" prefWidth="200.0" text="Ввести местоположение" visible="false">-->
                                     <!--                           <HBox.margin>-->
                                     <!--                              <Insets bottom="15.0" left="15.0" right="15.0" top="15.0" />-->
@@ -85,7 +90,7 @@
                                     <!--                              <Cursor fx:constant="HAND" />-->
                                     <!--                           </cursor>-->
                                 </Button>
-                                <Button fx:id="addLocationButton" mnemonicParsing="false" onAction="#handleAddLocation" prefHeight="37.0" prefWidth="194.0" text="Ввести координаты 📍" />
+                                <Button fx:id="addLocationButton" mnemonicParsing="false" onAction="#handleAddLocation" prefHeight="37.0" prefWidth="194.0" text="Ввести координаты" />
                             </children>
                         </HBox>
                         <AnchorPane fx:id="anchorPane" focusTraversable="true" prefHeight="500.0" prefWidth="900.0" />
@@ -100,6 +105,22 @@
                         </HBox>
                     </children>
                 </VBox>
+                <BorderPane fx:id="mainPane" layoutX="706.4" layoutY="36.0" prefHeight="521.0" prefWidth="194.0" AnchorPane.bottomAnchor="18.0" AnchorPane.leftAnchor="706.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="36.0">
+                    <center>
+                        <ListView fx:id="notificationsListView" prefHeight="492.0" prefWidth="194.0" BorderPane.alignment="CENTER" style="-fx-border-color: red; -fx-border-width: 2px;">
+                            <effect>
+                                <Shadow>
+                                    <color>
+                                        <Color red="0.8631578683853149" green="0.8503703474998474" blue="0.8503703474998474" />
+                                    </color>
+                                </Shadow>
+                            </effect>
+                        </ListView>
+                    </center>
+                    <top>
+                        <Label fx:id="firesInfoLabel" alignment="CENTER" prefHeight="0.0" prefWidth="142.0" text="Инфо о пожарах" underline="true" BorderPane.alignment="CENTER" />
+                    </top>
+                </BorderPane>
             </children>
         </AnchorPane>
     </children>
