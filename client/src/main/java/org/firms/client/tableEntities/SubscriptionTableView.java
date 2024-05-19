@@ -62,8 +62,6 @@ public class SubscriptionTableView {
         this.id = id;
         this.shortName = shortName;
         this.fullName = fullName;
-        this.latitude = latitude;
-        this.longitude = longitude;
     }
 
 

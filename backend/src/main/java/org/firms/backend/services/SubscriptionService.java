@@ -117,11 +117,9 @@ public class SubscriptionService {
      * @return Список FireEntity - пожаров
      */
     public List<FireEntity> getFiresNearBy(String username, String dateRange) throws InterruptedException, CsvValidationException, IOException {
-//        User user = userRepository.findUserByUsername(username);
         List<SubscriptionEntity> subscriptionEntities = findAllByUser(username);
         List<FireEntity> entities = new ArrayList<>();
         for(SubscriptionEntity entity: subscriptionEntities){
-//            List<FireEntity> allFires = FirmsRequests.getFiresFromCountry(user.getApiKey(), entity.getShortName(), dateRange);
             List<FireEntity> allFires = getFiresLastDays(username, dateRange);
             List<FireEntity> filteredFires = allFires.stream()
                     .filter(fire -> calculateDistance(entity.getLatitude(), entity.getLongitude(), fire.getLatitude(), fire.getLongitude()) <= 2000)
@@ -207,7 +205,7 @@ public class SubscriptionService {
     }
 
     /**
-     * Получение списка регионов, на которые не подписан пользователь
+     * Обновелние подписки илидобавление дефолтной подписки пользователя
      * @param username - имя пользователя
      * @param latitude - широта
      * @param longitude - долгота
@@ -215,9 +213,6 @@ public class SubscriptionService {
     public void addOrUpdateSubscription(String username, UUID subscriptionId, Double latitude, Double longitude) {
         User user = userRepository.findUserByUsername(username);
         List<Subscription> subscriptions = subscriptionRepository.findAllByUserAndId(user, subscriptionId);
-
-        // Поиск существующей активной подписки по пользователю и активности подписки
-        //List<Subscription> subscriptions = subscriptionRepository.findAllByUserAndActive(user, true);
 
         Subscription subscription;
         if (subscriptions.isEmpty()) {

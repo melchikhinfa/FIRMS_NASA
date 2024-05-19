@@ -80,35 +80,27 @@ public class SubscriptionController {
         return new ResponseEntity<>(entities, HttpStatus.OK);
     }
 
+    /**
+     * POST запрос добавления координат пользователя к подписке
+     * @param username имя пользователя
+     * @return
+     */
     @PostMapping("/{subscriptionId}/coordinates")
     public ResponseEntity<?> handleCoordinates(
             @PathVariable String username,
             @PathVariable UUID subscriptionId,
             @RequestBody @NotNull CoordinatesDTO coordinates) throws IOException, InterruptedException {
 
-//        double latitude = coordinates.getLatitude();
-//        double longitude = coordinates.getLongitude();
 
         subscriptionService.addOrUpdateSubscription(username, subscriptionId, coordinates.getLatitude(), coordinates.getLongitude());
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
-//    @PostMapping("/fires/notifications")
-//    public ResponseEntity<?> getFiresNearLastDays(
-//            @PathVariable String username,
-//            @RequestBody @NotNull CoordinatesDTO coordinates) throws CsvValidationException, IOException, InterruptedException {
-//        double latitude = coordinates.getLatitude();
-//        double longitude = coordinates.getLongitude();
-//        String dayRange = "1";
-//
-//        List<FireEntity> entities = subscriptionService.getFiresNearBy(username, latitude, longitude, dayRange);
-//
-//        if (entities.isEmpty()) {
-//            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-//        }
-//        return new ResponseEntity<>(entities, HttpStatus.OK);
-//    }
-
+    /**
+     * GET Запрос получения списка пожаров неподалеку от геолокации пользователя
+     * @param username имя пользователя
+     * @return
+     */
     @GetMapping("/fires/notifications")
     public ResponseEntity<?> getFiresNearLastDays(@PathVariable String username) throws CsvValidationException, IOException, InterruptedException {
         String dayRange = "1";

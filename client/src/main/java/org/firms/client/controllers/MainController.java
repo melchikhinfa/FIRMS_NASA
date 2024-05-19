@@ -43,6 +43,7 @@ import java.net.URL;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.ResourceBundle;
 
 public class MainController implements Initializable {
@@ -114,7 +115,7 @@ public class MainController implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         addLocationButton.setVisible(true);
-        addLocationButton.setOnAction(event -> handleAddLocation());
+//        addLocationButton.setOnAction(event -> handleAddLocation());
         fioLabel.setText(Utils.generateFIOLabelText());
 
         try {
@@ -128,6 +129,7 @@ public class MainController implements Initializable {
 
     }
 
+
     private MapView createMapView() throws IOException, InterruptedException {
         mapView = new MapView();
         mapView.setPrefSize(900,600);
@@ -136,38 +138,55 @@ public class MainController implements Initializable {
         mapView.setCenter(initialCenter);
         mapView.setZoom(10);
 
-        HttpResponse<String> response = Request.getRequest(URLGenerator.getSubscriptionsURL() + "/fires");
-        ObjectMapper om = new ObjectMapper();
 
         try {
-            HttpResponse<String> response2 = Request.getRequest(URLGenerator.getSubscriptionsURL()); // запрос на получение списка подписок
-            List<SubscriptionEntity> subs = om.readValue(response2.body(), new TypeReference<>(){});
-            List<FireEntity> points = om.readValue(response.body(), new TypeReference<>(){});
+            HttpResponse<String> response = Request.getRequest(URLGenerator.getSubscriptionsURL() + "/fires"); // запрос на получение списка пожаров
+            ObjectMapper om = new ObjectMapper();
 
-            assert subs != null && points != null;
-            csm = new CustomMapLayer();
-            for (FireEntity point : points) {
-                Node icon = new Circle(3, Color.RED);
-                csm.addPoint(new MapPoint(point.getLatitude(), point.getLongitude()), icon);
+            HttpResponse<String> response2 = Request.getRequest(URLGenerator.getSubscriptionsURL()); // запрос на получение списка подписок
+
+            if (Objects.equals(response2.body(), "")) {
+                Utils.generateAlert(
+                        Alert.AlertType.WARNING,
+                        "Внимание!",
+                        "Не выбрана подписка!",
+                        "Пожалуйста выберите подписку"
+                ).showAndWait();
+            } else {
+                List<SubscriptionEntity> subs = om.readValue(response2.body(), new TypeReference<>() {
+                });
+                List<FireEntity> points = om.readValue(response.body(), new TypeReference<>() {
+                });
+                assert subs != null && points != null;
+                csm = new CustomMapLayer();
+                for (FireEntity point : points) {
+                    Node icon = new Circle(3, Color.RED);
+                    csm.addPoint(new MapPoint(point.getLatitude(), point.getLongitude()), icon);
+                } // отрисовываем полученные fire entity точками на карте
+
+                Node userIcon = new Circle(7, Color.BLUE);
+                MapPoint userPoint = new MapPoint(subs.get(0).getLatitude(), subs.get(0).getLongitude());
+                csm.addPoint(userPoint, userIcon);
+
+                mapView.addLayer(csm);
+                mapView.setCenter(userPoint);
+                mapView.setZoom(13);
+                updateFireList();
+//                return mapView;
             }
 
-            Node userIcon = new Circle(7, Color.BLUE);
-            MapPoint userPoint = new MapPoint(subs.get(0).getLatitude(), subs.get(0).getLongitude());
-            csm.addPoint(userPoint, userIcon);
-
-            mapView.addLayer(csm);
-            mapView.setCenter(userPoint);
-            mapView.setZoom(5);
-            updateFireList();
-            return mapView;
 
         } catch (MismatchedInputException e) {
             e.printStackTrace();
             return mapView;
         }
 
+        return mapView;
     }
 
+    /**
+     * Кнопка отображения точек на карте
+     */
     @FXML
     private void showPoints(){
         showMap();
@@ -175,11 +194,16 @@ public class MainController implements Initializable {
         addLocationButton.setVisible(true);
     }
 
+    /**
+     * Метод для отображения карты и уведомлений
+     */
     private void showMap(){
         mapView = null;
         try {
             mapView = createMapView();
             anchorPane.getChildren().add(mapView);
+            addLocationButton.setOnAction(event -> handleAddLocation());
+            // сразу добавляем боксы уведомлений о пожарах при отрисовке карты с пользовательской точкой
             notificationsBox = new VBox(10); // 10 - пространство между элементами
             notificationsBox.setPadding(new Insets(10)); // Отступы вокруг VBox
             notificationsBox.setStyle("-fx-background-color: #EEE;"); // Цвет фона
@@ -193,9 +217,15 @@ public class MainController implements Initializable {
         }
     }
 
+    /**
+     * Кнопка добавления местоположения
+     */
     @FXML
-    private Button addLocationButton;
+    private Button addLocationButton; // кнопка выбора отметки на карте
 
+    /**
+     * Обработчик кнопки добавления местоположения
+     */
     @FXML
     private void handleAddLocation() {
         canAddLocation = true;
@@ -235,18 +265,38 @@ public class MainController implements Initializable {
         }
     }
 
+    /**
+     * Добавление на карту точки пользователя
+     * @param geoPoint - точка с координатами на карте
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private void addCustomPoint(MapPoint geoPoint) throws IOException, InterruptedException {
-        Node icon = new Circle(5, Color.BLUE); // Чёрный цвет для пользовательских точек
-        csm.addPoint(geoPoint, icon);
-        icon.setVisible(true);
+        Node icon = new Circle(5, Color.BLUE); // Синий цвет для пользовательских точек
+        if (csm != null) {
+            csm.addPoint(geoPoint, icon);
+            icon.setVisible(true);
+        } else {
+            Utils.generateAlert(
+                    Alert.AlertType.ERROR,
+                    "Ошибка",
+                    "Вы не можете добавить местоположение, пока не выбрана подписка",
+                    "Пожалуйста выберите подписку"
+            ).showAndWait();
+        }
+
     }
 
+    /**
+     * Установка авторефреша карты каждые 15 минут
+     */
     @FXML
     private void setupAutoRefresh() {
-        // Событие, которое будет повторяться каждый час
-        KeyFrame keyFrame = new KeyFrame(Duration.hours(1), event -> {
+        // Событие, которое будет повторяться каждые 15 минут
+        KeyFrame keyFrame = new KeyFrame(Duration.minutes(15), event -> {
             Platform.runLater(() -> {
                 try {
+                    // делаем авторефреш карты
                     createMapView();
                 } catch (IOException | InterruptedException e) {
                     throw new RuntimeException(e);
@@ -260,7 +310,14 @@ public class MainController implements Initializable {
         timeline.play(); // Запуск таймлайна
     }
 
+    /**
+     * Добавление отмеченной точки в подписку пользователя
+     * @param geoPoint - точка на карте
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private void addCoordinatesToSubs(MapPoint geoPoint) throws IOException, InterruptedException {
+        // забираем координаты из отмеченной точки для отправки бэку
         CoordinatesDTO entity = new CoordinatesDTO();
         entity.setLatitude(geoPoint.getLatitude());
         entity.setLongitude(geoPoint.getLongitude());
@@ -268,7 +325,7 @@ public class MainController implements Initializable {
         HttpResponse<String> response2 = Request.getRequest(URLGenerator.getSubscriptionsURL()); // запрос на получение списка подписок
         ObjectMapper om2 = new ObjectMapper();
         List<SubscriptionEntity> subs = om2.readValue(response2.body(), new TypeReference<>(){});
-        String subscriptionId = subs.get(0).getId().toString(); // id подписки
+        String subscriptionId = subs.get(0).getId().toString(); // id подписки, берем первую подписку RUS
 
         try {
             HttpResponse<String> response = Request.postRequest(URLGenerator.postSubsCooordinates(subscriptionId), entity);
@@ -300,6 +357,12 @@ public class MainController implements Initializable {
         HBox hbox = new HBox(5, label, closeButton); // 5 - расстояние между элементами в HBox
         Platform.runLater(() -> notificationsBox.getChildren().add(hbox));
     }
+
+    /**
+     * Метод обновляющий список уведомлений (для вывода боксов увдомлений)
+     * @throws IOException
+     * @throws InterruptedException
+     */
     @FXML
 //    private void updateFireList(MapPoint geoPoint) throws IOException, InterruptedException {
     private void updateFireList() throws IOException, InterruptedException {
@@ -310,6 +373,12 @@ public class MainController implements Initializable {
         }
     }
 
+    /**
+     * Получение отфильтрованного списка пожров в радиусе 1км от точки пользователя
+     * @return - Спискок FireEntity пожаров в радиусе 1км от точки
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private List<FireEntity> getFiresByCoordinates() throws IOException, InterruptedException {
         HttpResponse<String> response = Request.getRequest(URLGenerator.getFiresByCoords());
         if (response.statusCode() == 200) {
